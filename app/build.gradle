@@ -59,6 +59,9 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
+            // Allow installing CI debug builds alongside the regular phone app.
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
         }
     }
 
