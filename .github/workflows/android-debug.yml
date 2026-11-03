@@ -31,13 +31,13 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android 37 platform and build tools
+      # GitHub's ubuntu-latest runner already includes an Android SDK.
+      # Avoid setup-android's sdkmanager update, which fails on some runners.
+      - name: Use runner Android SDK
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-37" "platform-tools" "build-tools;37.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls -la "$ANDROID_HOME/platforms" || true
+          java -version
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
