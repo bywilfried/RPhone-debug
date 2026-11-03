@@ -53,6 +53,7 @@ class ContactsRepository(
         val contactsMap = mutableMapOf<String, Contact>()
         val rawContactsMap = mutableMapOf<String, MutableList<String>>()
         val accountMap = mutableMapOf<String, Pair<String?, String?>>()
+        val sourceAccountKeysMap = mutableMapOf<String, MutableSet<String>>()
 
         if (includePrivate) {
             privateContactDao.getAll().forEach {
@@ -122,11 +123,19 @@ class ContactsRepository(
                     val rawId = cursor.getString(rawIdIdx)
                     if (contactId != null && rawId != null) {
                         rawContactsMap.getOrPut(contactId) { mutableListOf() }.add(rawId)
+                        val name = if (accNameIdx != -1) cursor.getString(accNameIdx) else null
+                        val type = if (accTypeIdx != -1) cursor.getString(accTypeIdx) else null
+                        // Retain the original account for edit/move operations, but
+                        // retain every account for visibility of aggregated contacts.
                         if (accountMap[contactId] == null) {
-                            val name = if (accNameIdx != -1) cursor.getString(accNameIdx) else null
-                            val type = if (accTypeIdx != -1) cursor.getString(accTypeIdx) else null
                             accountMap[contactId] = Pair(name, type)
                         }
+                        val sourceKey = if (name == null && type == null) {
+                            "local|local"
+                        } else {
+                            "${type}|${name}"
+                        }
+                        sourceAccountKeysMap.getOrPut(contactId) { mutableSetOf() }.add(sourceKey)
                     }
                 }
             }
@@ -144,7 +153,8 @@ class ContactsRepository(
                 accountName = acc?.first,
                 accountType = acc?.second,
                 rawContactIds = rawIds,
-                hasMultipleSources = rawIds.size > 1
+                hasMultipleSources = rawIds.size > 1,
+                sourceAccountKeys = sourceAccountKeysMap[id]?.toSet() ?: emptySet()
             )
         }
 
@@ -216,7 +226,8 @@ class ContactsRepository(
                             accountName = accInfo?.first,
                             accountType = accInfo?.second,
                             rawContactIds = rawContactsMap[id] ?: emptyList(),
-                            hasMultipleSources = (rawContactsMap[id]?.size ?: 0) > 1
+                            hasMultipleSources = (rawContactsMap[id]?.size ?: 0) > 1,
+                            sourceAccountKeys = sourceAccountKeysMap[id]?.toSet() ?: emptySet()
                         )
                     }
 
