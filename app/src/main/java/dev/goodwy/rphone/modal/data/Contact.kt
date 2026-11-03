@@ -32,7 +32,9 @@ data class Contact(
     val isPrivate: Boolean = false,
     val isHidden: Boolean = false,
     val rawContactIds: List<String> = emptyList(),
-    val hasMultipleSources: Boolean = false
+    val hasMultipleSources: Boolean = false,
+    /** Every account owning a raw contact in this Android aggregate. */
+    val sourceAccountKeys: Set<String> = emptySet()
 ) {
     val displayName: String
         get() = getDisplayName(this)
