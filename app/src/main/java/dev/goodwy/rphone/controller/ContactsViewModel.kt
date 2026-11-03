@@ -90,12 +90,18 @@ class ContactsViewModel(
      * Device-only contacts (no account at all) use the pseudo source "local|local", contacts that
      * only exist inside the app use "private|private", everything else "type|name".
      */
-    private fun visibilityKeyOf(contact: Contact): String = when {
-        contact.accountType == null && contact.accountName == null ->
-            if (contact.isPrivate) "private|private" else "local|local"
-
-        else -> "${contact.accountType}|${contact.accountName}"
+    private fun visibilityKeysOf(contact: Contact): Set<String> = when {
+        contact.isPrivate -> setOf("private|private")
+        contact.sourceAccountKeys.isNotEmpty() -> contact.sourceAccountKeys
+        contact.accountType == null && contact.accountName == null -> setOf("local|local")
+        else -> setOf("${contact.accountType}|${contact.accountName}")
     }
+
+    private fun isVisibleFromSelectedSources(
+        contact: Contact,
+        visibleAccounts: Set<String>?
+    ): Boolean = visibleAccounts == null ||
+        visibilityKeysOf(contact).any { it in visibleAccounts }
 
     /**
      * All contacts, reduced to the sources the user has enabled in the contact source settings.
@@ -107,7 +113,7 @@ class ContactsViewModel(
         _visibleAccounts
     ) { contacts, visibleAccounts ->
         if (visibleAccounts == null) contacts
-        else contacts.filter { visibleAccounts.contains(visibilityKeyOf(it)) }
+        else contacts.filter { isVisibleFromSelectedSources(it, visibleAccounts) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val filteredAvailableAccounts: StateFlow<List<Account>> = combine(
@@ -133,12 +139,15 @@ class ContactsViewModel(
     ) { contacts, account, privateOnly, localOnly, visibleAccounts ->
         when {
             privateOnly -> contacts.filter { it.isPrivate }
-            localOnly -> contacts.filter { it.accountName == null && it.accountType == null && !it.isPrivate }
+            localOnly -> contacts.filter { !it.isPrivate && "local|local" in visibilityKeysOf(it) }
             account == null -> {
                 if (visibleAccounts == null) contacts
-                else contacts.filter { contact -> visibleAccounts.contains(visibilityKeyOf(contact)) }
+                else contacts.filter { contact -> isVisibleFromSelectedSources(contact, visibleAccounts) }
             }
-            else -> contacts.filter { it.accountName == account.name && it.accountType == account.type }
+            else -> contacts.filter { contact ->
+                "${account.type}|${account.name}" in visibilityKeysOf(contact) &&
+                    isVisibleFromSelectedSources(contact, visibleAccounts)
+            }
         }
     }
 
